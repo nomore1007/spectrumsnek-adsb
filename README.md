@@ -5,6 +5,7 @@ A modular ADS-B radar plugin for [SpectrumSnek](https://github.com/nomore1007/sp
 ## Features
 
 - Uses readsb JSON output rather than implementing a separate ADS-B decoder.
+- Builds and installs a project-local copy of readsb with RTL-SDR support on first radar launch when no plugin-managed build is present.
 - Builds and installs a project-local copy of readsb with RTL-SDR support on first plugin installation.
 - Shares SpectrumSnek's RTL-SDR ownership manager to avoid competing for the same dongle.
 - Implements both plugin metadata interfaces: `MODULE_INFO` and `get_module_info()`, for compatibility with SpectrumSnek's current shared discovery backend and legacy loader.
