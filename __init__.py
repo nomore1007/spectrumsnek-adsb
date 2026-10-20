@@ -3,7 +3,6 @@ import argparse
 import curses
 import os
 import sys
-import os
 import time
 import traceback
 
@@ -27,10 +26,10 @@ def _log_error(message, exc_info=False):
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     try:
         with open(os.path.join(root, "error.log"), "a", encoding="utf-8") as log_file:
-            log_file.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [adsb_radar] {message}\\n")
+            log_file.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [adsb_radar] {message}\n")
             if exc_info:
                 log_file.write(traceback.format_exc())
-                log_file.write("\\n")
+                log_file.write("\n")
     except OSError as log_exc:
         print(f"ADS-B radar: unable to write error.log: {log_exc}; {message}", file=sys.stderr)
 
