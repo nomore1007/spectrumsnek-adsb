@@ -7,18 +7,48 @@ import os
 import sys
 import argparse
 from datetime import datetime
+import logging
+import traceback
+
+
+def _error_log_path():
+    # radar.py lives in <SpectrumSnek>/plugins/adsb_radar/.
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "error.log")
+
+
+def _log_error(message, exc_info=False):
+    """Append plugin diagnostics to SpectrumSnek's root error.log."""
+    try:
+        with open(_error_log_path(), "a", encoding="utf-8") as log_file:
+            log_file.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [adsb_radar] {message}\\n")
+            if exc_info:
+                log_file.write(traceback.format_exc())
+                log_file.write("\\n")
+    except OSError as log_exc:
+        print(f"ADS-B radar: unable to write error log: {log_exc}; original error: {message}", file=sys.stderr)
 
 # Path to aircraft.json from readsb
 AIRCRAFT_JSON = "/run/readsb/aircraft.json"
 
 def get_aircraft_data(json_path):
-    try:
-        if not os.path.exists(json_path):
-            return None
-        with open(json_path, 'r') as f:
-            return json.load(f)
-    except Exception:
+    """Read readsb JSON; log real read failures without logging normal startup polling."""
+    if not os.path.exists(json_path):
         return None
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if not isinstance(data, dict) or not isinstance(data.get('aircraft', []), list):
+            raise ValueError("expected a JSON object containing an 'aircraft' list")
+        return data
+    except (OSError, json.JSONDecodeError, UnicodeError, ValueError) as exc:
+        # Avoid flooding error.log when readsb is in the middle of rewriting its file.
+        signature = (type(exc).__name__, str(exc))
+        if getattr(get_aircraft_data, "_last_error", None) != (json_path, signature):
+            _log_error(f"Could not read aircraft data from {json_path}: {type(exc).__name__}: {exc}", exc_info=True)
+            get_aircraft_data._last_error = (json_path, signature)
+        return None
+    else:
+        get_aircraft_data._last_error = None
 
 def main(stdscr, args):
     # Setup curses
