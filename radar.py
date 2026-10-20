@@ -7,7 +7,6 @@ import os
 import sys
 import argparse
 from datetime import datetime
-import logging
 import traceback
 
 
