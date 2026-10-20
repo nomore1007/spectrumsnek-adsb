@@ -6,7 +6,6 @@ A modular ADS-B radar plugin for [SpectrumSnek](https://github.com/nomore1007/sp
 
 - Uses readsb JSON output rather than implementing a separate ADS-B decoder.
 - Builds and installs a project-local copy of readsb with RTL-SDR support on first radar launch when no plugin-managed build is present.
-- Builds and installs a project-local copy of readsb with RTL-SDR support on first plugin installation.
 - Shares SpectrumSnek's RTL-SDR ownership manager to avoid competing for the same dongle.
 - Implements both plugin metadata interfaces: `MODULE_INFO` and `get_module_info()`, for compatibility with SpectrumSnek's current shared discovery backend and legacy loader.
 - Runs through SpectrumSnek's plugin launcher, including the Whiptail menu and the experimental Textual menu; the radar itself remains a terminal/curses view.
@@ -22,10 +21,10 @@ Use SpectrumSnek's **Utilities → Installed Plugins** menu, or from the Spectru
 bash plugin_manager.sh install adsb_radar
 ```
 
-The SpectrumSnek plugin manager runs this repository's `setup.sh` after install or update. It installs missing Debian build dependencies if needed, clones/updates the upstream readsb source in `.local/src/readsb`, compiles it with `RTLSDR=yes`, and installs it to `.local/bin/readsb`. A marker prevents unnecessary rebuilds on every plugin update. To force a rebuild:
+The radar automatically runs this repository's `setup.sh` on first launch when the project-local RTL-SDR-enabled build is missing or has not been created by this setup script. It installs missing Debian build dependencies if needed, clones/updates upstream readsb in `.local/src/readsb`, compiles it with `RTLSDR=yes`, and installs it to `.local/bin/readsb`. A marker prevents unnecessary rebuilds. To force a rebuild, run from the SpectrumSnek root:
 
 ```bash
-FORCE_READSB_BUILD=1 bash plugins/adsb_radar/setup.sh
+FORCE_READSB_BUILD=1 SPECTRUMSNEK_ROOT="$PWD" bash plugins/adsb_radar/setup.sh
 ```
 
 For a manual installation from the SpectrumSnek checkout:
