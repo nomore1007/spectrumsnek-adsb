@@ -3,6 +3,7 @@
 import argparse
 import curses
 import os
+import subprocess
 import sys
 import time
 import traceback
@@ -16,13 +17,14 @@ from . import radar
 MODULE_INFO = {
     "name": "✈️ ADS-B Radar",
     "description": "Live aircraft radar using readsb and the shared RTL-SDR manager",
-    "version": "2.1.0",
+    "version": "2.2.0",
     "author": "SpectrumSnek",
     "category": "radio",
     "capabilities": [
         "readsb-backed ADS-B",
         "terminal radar",
         "shared SDR ownership",
+        "first-run RTL-SDR-enabled readsb build",
     ],
 }
 
@@ -45,6 +47,36 @@ def _log_error(message, exc_info=False):
         print(f"ADS-B radar: unable to write error.log: {log_exc}; {message}", file=sys.stderr)
 
 
+def _ensure_readsb():
+    """Build the project-local RTL-SDR-enabled readsb on first use if needed."""
+    # An explicit binary override is intentional; leave its configuration alone.
+    if os.environ.get("READSB_BIN"):
+        return
+
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    binary = os.path.join(root, ".local", "bin", "readsb")
+    marker = os.path.join(root, ".local", "bin", "readsb.rtlsdr-build")
+    setup_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "setup.sh")
+
+    if os.path.isfile(binary) and os.access(binary, os.X_OK) and os.path.isfile(marker):
+        return
+    if not os.path.isfile(setup_script):
+        raise RuntimeError(
+            "The RTL-SDR-enabled readsb binary is missing and the plugin setup.sh "
+            "is unavailable. Reinstall/update the ADS-B plugin."
+        )
+
+    print("ADS-B Radar: preparing an RTL-SDR-enabled readsb build (first run)...", flush=True)
+    env = os.environ.copy()
+    env["SPECTRUMSNEK_ROOT"] = root
+    try:
+        subprocess.run(["bash", setup_script], cwd=root, env=env, check=True)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError(
+            f"Could not build RTL-SDR-enabled readsb. See setup.log/error output. {exc}"
+        ) from exc
+
+
 def run(stdscr=None, *args, **kwargs):
     """Run the radar from SpectrumSnek's menu, service, or module entry point."""
     # The current menu launches plugins in a child process via plugin_menu.py.
@@ -53,13 +85,19 @@ def run(stdscr=None, *args, **kwargs):
     if stdscr is not None and not hasattr(stdscr, "getch"):
         stdscr = None
 
-    manager = SDRManager()
-    json_path = os.environ.get(
-        "SPECTRUMSNEK_AIRCRAFT_JSON",
-        os.path.join(manager.json_dir, "aircraft.json"),
-    )
     owns_decoder = os.environ.get("SPECTRUMSNEK_EXTERNAL_READSB") != "1"
     try:
+        # Build the native decoder before creating SDRManager, so it selects the
+        # freshly installed project-local binary rather than an incompatible
+        # system package. External JSON mode does not need a local build.
+        if owns_decoder:
+            _ensure_readsb()
+
+        manager = SDRManager()
+        json_path = os.environ.get(
+            "SPECTRUMSNEK_AIRCRAFT_JSON",
+            os.path.join(manager.json_dir, "aircraft.json"),
+        )
         # An externally managed readsb can be reused by setting
         # SPECTRUMSNEK_EXTERNAL_READSB=1 and optionally SPECTRUMSNEK_AIRCRAFT_JSON.
         # In that mode the plugin never acquires or releases the SDR lock.
@@ -87,7 +125,9 @@ def run(stdscr=None, *args, **kwargs):
         raise
     finally:
         if owns_decoder:
-            manager.stop_readsb()
+            # Manager may not have been created if the bootstrap failed.
+            if "manager" in locals():
+                manager.stop_readsb()
 
 
 if __name__ == "__main__":

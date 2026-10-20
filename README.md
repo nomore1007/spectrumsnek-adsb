@@ -5,6 +5,7 @@ A modular ADS-B radar plugin for [SpectrumSnek](https://github.com/nomore1007/sp
 ## Features
 
 - Uses readsb JSON output rather than implementing a separate ADS-B decoder.
+- Builds and installs a project-local copy of readsb with RTL-SDR support on first radar launch when no plugin-managed build is present.
 - Shares SpectrumSnek's RTL-SDR ownership manager to avoid competing for the same dongle.
 - Implements both plugin metadata interfaces: `MODULE_INFO` and `get_module_info()`, for compatibility with SpectrumSnek's current shared discovery backend and legacy loader.
 - Runs through SpectrumSnek's plugin launcher, including the Whiptail menu and the experimental Textual menu; the radar itself remains a terminal/curses view.
@@ -20,15 +21,20 @@ Use SpectrumSnek's **Utilities → Installed Plugins** menu, or from the Spectru
 bash plugin_manager.sh install adsb_radar
 ```
 
+The radar automatically runs this repository's `setup.sh` on first launch when the project-local RTL-SDR-enabled build is missing or has not been created by this setup script. It installs missing Debian build dependencies if needed, clones/updates upstream readsb in `.local/src/readsb`, compiles it with `RTLSDR=yes`, and installs it to `.local/bin/readsb`. A marker prevents unnecessary rebuilds. To force a rebuild, run from the SpectrumSnek root:
+
+```bash
+FORCE_READSB_BUILD=1 SPECTRUMSNEK_ROOT="$PWD" bash plugins/adsb_radar/setup.sh
+```
+
 For a manual installation from the SpectrumSnek checkout:
 
 ```bash
 git clone https://github.com/nomore1007/spectrumsnek-adsb.git plugins/adsb_radar
+SPECTRUMSNEK_ROOT="$PWD" bash plugins/adsb_radar/setup.sh
 ```
 
-The plugin expects SpectrumSnek's shared `sdr_manager.py` at the application root. Keep that shared manager in place; do not copy a second manager into the plugin directory. The manager coordinates SDR ownership and starts/stops readsb when this plugin owns the decoder.
-
-Install/build an RTL-SDR-enabled readsb using SpectrumSnek's setup instructions. If needed, set `READSB_BIN` to the full path of the readsb executable.
+The plugin expects SpectrumSnek's shared `sdr_manager.py` at the application root. Keep that shared manager in place; do not copy a second manager into the plugin directory. The manager prefers `.local/bin/readsb` over a system binary, avoiding distro builds that may lack RTL-SDR support. Set `READSB_BIN` only if you intentionally want to use a different binary.
 
 ## Run
 
@@ -52,11 +58,11 @@ In external mode, the plugin does not acquire the SDR lock or manage the decoder
 
 - Linux
 - Python 3
+- Git, make, a C compiler, pkg-config, and RTL-SDR development libraries (the setup script installs missing Debian packages when possible)
 - SpectrumSnek's shared `sdr_manager.py` when running under SpectrumSnek
-- `readsb` built with RTL-SDR support unless using external JSON output
 - A supported RTL-SDR receiver for direct decoding
 
-The application can report a missing dongle or an unsupported readsb build, but it cannot make a physically absent or inaccessible device available. Do not run two independent decoders against the same SDR.
+The setup script builds readsb with RTL-SDR support, but cannot make a physically absent or inaccessible device available. Do not run two independent decoders against the same SDR.
 
 ## Development
 
